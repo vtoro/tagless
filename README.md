@@ -1,2 +1,0 @@
-# tagless
-Tagless monads
