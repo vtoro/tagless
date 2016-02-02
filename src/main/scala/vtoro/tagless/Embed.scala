@@ -4,19 +4,23 @@ import language.higherKinds
 import cats.Monad
 import Interpreter.and
 
+/* A transformation from G[_[_]] to F[_[_]] */
 trait Embed[F[_[_]],G[_[_]]] {
   def apply[M[_] : Monad]( f: Interpreter[G,M] ) : Interpreter[F,M]
 }
 
 object Embed {
-  def embedLeft[F[_[_]],G[_[_]]] : Embed[F,(F and G)#pair] = new Embed[F,(F and G)#pair] {
+  def left[F[_[_]],G[_[_]]] : Embed[F,(F and G)#pair] = new Embed[F,(F and G)#pair] {
     def apply[M[_] : Monad](f: Interpreter[(F and G)#pair,M]): Interpreter[F,M] = f.init.left andThen f.nt
   }
-  def embedRight[F[_[_]],G[_[_]]] : Embed[F,(G and F)#pair] = new Embed[F,(G and F)#pair] {
-    def apply[M[_] : Monad](f: Interpreter[(G and F)#pair,M]): Interpreter[F,M] = f.init.right andThen f.nt
+  def right[F[_[_]],G[_[_]]] : Embed[G,(F and G)#pair] = new Embed[G,(F and G)#pair] {
+    def apply[M[_] : Monad](f: Interpreter[(F and G)#pair,M]): Interpreter[G,M] = f.init.right andThen f.nt
   }
-  def embedFinalRight[F[_[_]],G[_[_]]] : Embed[F,(G and F)#fin] = new Embed[F,(G and F)#fin] {
-    def apply[M[_] : Monad](f: Interpreter[(G and F)#fin, M]): Interpreter[F, M] = f.init.right andThen f.nt
+  def finRight[F[_[_]],G[_[_]]] : Embed[G,(F and G)#fin] = new Embed[G,(F and G)#fin] {
+    def apply[M[_] : Monad](f: Interpreter[(F and G)#fin, M]): Interpreter[G, M] = f.init.right andThen f.nt
+  }
+  def finLeft[F[_[_]],G[_[_]]] : Embed[F,(F and G)#fin] = new Embed[F,(F and G)#fin] {
+    def apply[M[_] : Monad](f: Interpreter[(F and G)#fin, M]): Interpreter[F, M] = Interpreter( f.init.left ) andThen f.nt
   }
 
   def apply[F[_[_]],G[_[_]]] : EmbedBuilder[F,G] = new EmbedBuilder[F,G] {}

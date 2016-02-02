@@ -59,8 +59,8 @@ sealed trait TermBuilder[F[_[_]]] {
       interpreter.nt(
         /* casts X to interpreter.G */
         f.asInstanceOf[F[interpreter.G] => Interpreter[(F and G)#fin, interpreter.G] => Monad[interpreter.G] => interpreter.G[A]]
-          (interpreter.init.leftI)
-          (Final(interpreter.init.leftI)(interpreter.init.monad) and interpreter.init.right)
+          (interpreter.init.left)
+          (Final(interpreter.init.left)(interpreter.init.monad) and interpreter.init.right)
           (interpreter.init.monad)
       )
     }

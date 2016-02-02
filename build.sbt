@@ -12,9 +12,7 @@ scalacOptions ++= Seq (
   "-Xfatal-warnings"
 )
 
-resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
-
-libraryDependencies += "org.spire-math" %% "cats" % "0.4.0-SNAPSHOT"
+libraryDependencies += "org.typelevel" %% "cats" % "0.4.0"
 
 addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.7.1")
 

@@ -16,16 +16,19 @@ Cons:
 
 The idea came from this blog post: https://pchiusano.github.io/2014-05-20/scala-gadts.html.
 
+## Example
+
+See: [test.scala](https://github.com/vtoro/tagless/blob/master/src/main/scala/test.scala)
+
 # Tutorial
 
 Imports:
 ```tut:silent
 import language.higherKinds
 import vtoro.tagless._
-import vtoro.tagless.autoEmbed._
 import vtoro.tagless.Interpreter.and
 import cats._
-import cats.state._
+import cats.data._
 import cats.syntax.flatMap._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
@@ -138,29 +141,29 @@ def put( key: String, value: String ) = Term[KVStore].mkTerm( _.put( key, value 
 def get( key: String ) = Term[KVStore].mkTerm( _.get( key ) )
 ```
 
-To combine two algebras we define an algebra/interpreter pair that combines both algebras.
+To combine two algebras we define an algebra/interpreter pair that combines both algebras. And two embeddings, from ```Console``` to ```CKV``` and from ```KVStore``` to ```CKV```-
 
 ```tut:book
 type CKV[X[_]] = (Console and KVStore)#pair[X]
+val ConsoleToCKV : Embed[Console,CKV] = Embed.left
+val KVStoreToCKV : Embed[KVStore,CKV] = Embed.right
 ```
 
-```tagless.autoEmbed``` defines automatic implicit embeddings for any pairs of algebras so we dont need to define how to go from ```Console``` to ```CKV``` or from ```KVStore``` to ```CKV```.
-
-To turn a Term of one algebra into a Term of another bigger/encompassing algebra we use ```.as[A]``` where A is the new bigger algebra for which we have an embedding available.
+To turn a Term of algebra ```A``` into a Term of another bigger/encompassing algebra ```B``` we use ```Term[A,X].as[B](Embed[A,B]) : Term[B,X]```.
 
 ```tut:book
-val prg2 = for {
-  user <- prg1.as[CKV]
-  maybePwd <- get( user ).as[CKV]
+val prg2 : Term[CKV,(String,Boolean)] = for {
+  user <- prg1.as( ConsoleToCKV )
+  maybePwd <- get( user ).as( KVStoreToCKV )
   authenticated <-
-  (maybePwd.fold
-    ( putLine("You need to create an account!") >> Term.pure[Console,Boolean](false) )
-    ( password => putLine("Password:") >> getLine.map( _ == password ) )
-    ).as[CKV]
+    (maybePwd.fold
+      ( putLine("You need to create an account!") >> Term.pure[Console,Boolean](false) )
+      ( password => putLine("Password:") >> getLine.map( _ == password ) )
+    ).as( ConsoleToCKV )
 } yield (user, authenticated)
 ```
 
-As before lets define an interpreter for our KVStore, for this we'll use cats.state
+As before lets define an interpreter for our KVStore, for this we'll use State
 
 ```tut:book
 type KVState[X] = State[Map[String,String],X]
@@ -178,11 +181,11 @@ We can also make a pair out of two interpreters with ``` and ```, but they must 
 We can now use a natural transformation to go from ```Id``` to ```KVState```, and after that we can do the pairing.
 
 ```tut:book
-object idToKVState extends (Id ~> KVState) {
+object IdToKVState extends (Id ~> KVState) {
   def apply[A](fa: Id[A]): KVState[A] = State.pure(fa)
 }
 
-val testCKV : Interpreter[CKV,KVState] = (consoleTest andThen idToKVState) and testKV
+val testCKV : Interpreter[CKV,KVState] = (consoleTest andThen IdToKVState) and testKV
 ```
 
 and now were ready to run our program
@@ -208,13 +211,15 @@ def debug( s: String ) = Term[Logging].mkTerm( _.debug(s) )
 def warning( s: String ) = Term[Logging].mkTerm( _.warning(s) )
 
 type LCKV[X[_]] = (Logging and CKV)#pair[X]
+val CKVtoLCKV : Embed[CKV,LCKV] = Embed.right[Logging,CKV]
+val LoggingToLCKV : Embed[Logging,LCKV] = Embed.left[Logging,CKV]
 
 val prg3 = for {
-  userTuple <- prg2.as[LCKV]
+  userTuple <- prg2.as( CKVtoLCKV )
   _ <- if( userTuple._2 )
-         debug(s"User: '${userTuple._1}' successfully authenticated!").as[LCKV]
+         debug(s"User: '${userTuple._1}' successfully authenticated!").as( LoggingToLCKV )
        else
-         warning(s"User: '${userTuple._1}' was not authenticated!").as[LCKV]
+         warning(s"User: '${userTuple._1}' was not authenticated!").as( LoggingToLCKV )
 } yield userTuple
 ```
 
@@ -231,8 +236,8 @@ class ConsoleLogging[M[_] : Monad](f: Interpreter[Console,M] ) extends Logging[M
 }
 ```
 
-We then turn it into an instance of ```Embed[Logging,Console]``` for this we use either
-toAlgebra which takes an ```Interpreter[A,M] => Monad[M] => B[M]``` and returns an ```Embed[A,B]``` or
+We then turn it into an instance of ```Embed[Logging,Console]``` for this we can EmbedBuilder, and either  
+toAlgebra which takes an ```Interpreter[A,M] => Monad[M] => B[M]``` and returns an ```Embed[A,B]``` or  
 toInterpreter which takes an ```Interpreter[A,M] => Monad[M] => Interpreter[B,M]``` and returns an ```Embed[A,B]```  
 
 ```tut:book
@@ -242,7 +247,7 @@ val consoleToLogging = Embed[Logging,Console].toAlgebra(c => implicit m => new C
 we can now define an interpreter for ```LCKV```, and use it to run our new program
  
 ```tut:book
-val testLCKV = consoleToLogging( consoleTest andThen idToKVState ) and testCKV
+val testLCKV = consoleToLogging( consoleTest andThen IdToKVState ) and testCKV
 
 prg3.run( testLCKV ).run( Map( "user" -> "password" ) ).value
 prg3.run( testLCKV ).run( Map( "test" -> "test" ) ).value
@@ -251,20 +256,20 @@ prg3.run( testLCKV ).run( Map( "test" -> "test" ) ).value
 we can also get rid of the Logging aspect of ```LCKV``` algebra, we already defined how we go from ```Logging``` to ```Console``` 
 now we just need to go from ```LCKV``` to ```CKV```. 
 
-To do that we define how we can take an Intepreter of ```CKV``` named ```iCVK``` and provide an interpreter of ```LCKV```. We start by taking the init of ```iCKV``` 
-which we know is a pair of ```Console``` and ```KeyStore```, we take the left interpreter, which is the ```Console``` interpreter, we then compose it with whatever 
-natural transformations(```CKV.nt```) ```CKV``` had, we use our previously defined ```logToConsole``` to transform that ```Console``` interpreter into a ```Logging``` interpreter, 
-and we then pair it up with the same ```CKV``` interpreter. 
+To do that we define how we can take an Intepreter of ```CKV``` named and provide an interpreter of ```LCKV```.   
+We start by taking the init of ```CKV``` which we know is a pair of ```Console``` and ```KeyStore```, we take the left interpreter, which is the ```Console``` interpreter, 
+we then compose it with whatever natural transformations the ```CKV``` interpreter had, we use our previously defined ```logToConsole``` to transform that 
+```Console``` interpreter into a ```Logging``` interpreter, and we then pair it up with the same ```CKV``` interpreter. 
 
   
 ```tut:book
-val LCKVtoCKV = Embed[LCKV,CKV].toInterpreter(iCKV => implicit m => consoleToLogging(iCKV.init.left andThen iCKV.nt) and[CKV] iCKV )
+val LCKVtoCKV : Embed[LCKV,CKV] = Embed[LCKV,CKV].toInterpreter(iCKV => implicit m => consoleToLogging(iCKV.init.left andThen iCKV.nt) and[CKV] iCKV )
 ```
  
 we can now take any ```Term[LCKV,_]``` and embed it in just ```CKV```, and run it with just a ```CKV``` interpreter
  
 ```tut:book
-val prg3ckv = prg3.as[CKV]( LCKVtoCKV )
+val prg3ckv = prg3.as( LCKVtoCKV )
 
 prg3ckv.run( testCKV ).run( Map( "test" -> "test" ) ).value
 ```
@@ -308,6 +313,7 @@ leaving the only option to the left side to be just the plain algebra, without n
 we can now proceed to create some auxiliary definitions, like our target monads type: ```FKVState```
 ```tut:book
 type PCKV[M[_]] = (Parallel and CKV)#fin[M]
+val CKVtoPCKV : Embed[CKV,PCKV] = Embed.finRight[Parallel,CKV]
 type FKVState[A] = StateT[Future,Map[String,String],A]
 implicit val FKVStateMonad : Monad[FKVState] = StateT.stateTMonadState[Future,Map[String,String]]
 def parPCKV[X](l: List[Term[PCKV,X]] ) : Term[PCKV,List[X]] = par[CKV,X]( l )
@@ -336,7 +342,7 @@ val futurePCKVInterpreter = Final( futureParallel ) and (testCKV andThen stateTo
 a simple program in ```PCKV```
 
 ```tut:book
-val prg4 = parPCKV( prg3ckv.as[PCKV] :: prg3ckv.as[PCKV] :: Nil )
+  val prg4 = parPCKV( prg3ckv.as(CKVtoPCKV) :: prg3ckv.as(CKVtoPCKV) :: Nil )
 ```
 
 running it, and then waiting for the result
