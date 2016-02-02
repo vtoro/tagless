@@ -84,7 +84,7 @@ val prg1 = for {
   name <- getLine
   _ <- putLine( s"Hello $name" )
 } yield name 
-// prg1: vtoro.tagless.Term[Console,String] = vtoro.tagless.Term$$anon$3@4c3e390f
+// prg1: vtoro.tagless.Term[Console,String] = vtoro.tagless.Term$$anon$3@726bb7bd
 ```
 
 Notice that the program is also just a Term.
@@ -101,7 +101,7 @@ object TestConsole extends Console[Id] {
 // defined object TestConsole
 
 val consoleTest = Interpreter( TestConsole )
-// consoleTest: vtoro.tagless.Interpreter[Console,cats.Id] = InterpreterInit(TestConsole$@785d80fa)
+// consoleTest: vtoro.tagless.Interpreter[Console,cats.Id] = InterpreterInit(TestConsole$@16d93ea5)
 ```
 
 here we're defining an interpretation of the algebra into the context ```Id``` which is just ```Id[A] = A```, that is it has no special context.
@@ -130,11 +130,11 @@ object idToEval extends (Id ~> Eval) {
 
 val evalPrg1 = prg1.run( consoleTest andThen idToEval )
 // What is your Name?
-// evalPrg1: cats.Eval[String] = cats.Eval$$anon$8@284a8abb
+// evalPrg1: cats.Eval[String] = cats.Eval$$anon$8@26ab8a9f
 ```
 
-Notice that it did execute the first action of the program before halting the Eval, this is because we need to evaluate the first Id value to get the first Eval value.
-But after we have the first Eval value, it then use flatMap to bind the actions together, and it halts until we call .value on it
+Notice that it did execute the first action of the program before halting the `Eval`, this is because we need to evaluate the first `Id` value to get the first `Eval` value.
+But after we have the first `Eval` value, it then uses `Eval`s flatMap to bind the actions together, and it halts until we call .value on it
 
 ```scala
 evalPrg1.value
@@ -145,7 +145,7 @@ evalPrg1.value
 
 ### Pairing algebras
 
-Lets say we want to have a program that uses a key store as well as a console.
+Lets say we want to have a program that uses a key-value store as well as a console.
 
 ```scala
 trait KVStore[M[_]] {
@@ -168,10 +168,10 @@ type CKV[X[_]] = (Console and KVStore)#pair[X]
 // defined type alias CKV
 
 val ConsoleToCKV : Embed[Console,CKV] = Embed.left
-// ConsoleToCKV: vtoro.tagless.Embed[Console,CKV] = vtoro.tagless.Embed$$anon$1@44d9d993
+// ConsoleToCKV: vtoro.tagless.Embed[Console,CKV] = vtoro.tagless.Embed$$anon$1@4ca633ed
 
 val KVStoreToCKV : Embed[KVStore,CKV] = Embed.right
-// KVStoreToCKV: vtoro.tagless.Embed[KVStore,CKV] = vtoro.tagless.Embed$$anon$2@6a062115
+// KVStoreToCKV: vtoro.tagless.Embed[KVStore,CKV] = vtoro.tagless.Embed$$anon$2@2e270405
 ```
 
 To turn a Term of algebra ```A``` into a Term of another bigger/encompassing algebra ```B``` we use ```Term[A,X].as[B](Embed[A,B]) : Term[B,X]```.
@@ -186,7 +186,7 @@ val prg2 : Term[CKV,(String,Boolean)] = for {
       ( password => putLine("Password:") >> getLine.map( _ == password ) )
     ).as( ConsoleToCKV )
 } yield (user, authenticated)
-// prg2: vtoro.tagless.Term[CKV,(String, Boolean)] = vtoro.tagless.Term$$anon$3@4efeaa99
+// prg2: vtoro.tagless.Term[CKV,(String, Boolean)] = vtoro.tagless.Term$$anon$3@6d22c8e9
 ```
 
 As before lets define an interpreter for our KVStore, for this we'll use State
@@ -202,7 +202,7 @@ object TestKVStore extends KVStore[KVState] {
 // defined object TestKVStore
 
 val testKV = Interpreter( TestKVStore )
-// testKV: vtoro.tagless.Interpreter[KVStore,KVState] = InterpreterInit(TestKVStore$@3bc7c4ee)
+// testKV: vtoro.tagless.Interpreter[KVStore,KVState] = InterpreterInit(TestKVStore$@999293c)
 ```
 
 We now have an interpreter from ```Console``` to ```Id``` and from ```KVStore``` to ```KVState```
@@ -216,7 +216,7 @@ object IdToKVState extends (Id ~> KVState) {
 // defined object IdToKVState
 
 val testCKV : Interpreter[CKV,KVState] = (consoleTest andThen IdToKVState) and testKV
-// testCKV: vtoro.tagless.Interpreter[CKV,KVState] = InterpreterInit(InterpreterPair(InterpreterNT(TestConsole$@785d80fa,cats.arrow.NaturalTransformation$$anon$1@1a57fafe),InterpreterInit(TestKVStore$@3bc7c4ee)))
+// testCKV: vtoro.tagless.Interpreter[CKV,KVState] = InterpreterInit(InterpreterPair(InterpreterNT(TestConsole$@16d93ea5,cats.arrow.NaturalTransformation$$anon$1@1acfab29),InterpreterInit(TestKVStore$@999293c)))
 ```
 
 and now were ready to run our program
@@ -257,10 +257,10 @@ type LCKV[X[_]] = (Logging and CKV)#pair[X]
 // defined type alias LCKV
 
 val CKVtoLCKV : Embed[CKV,LCKV] = Embed.right[Logging,CKV]
-// CKVtoLCKV: vtoro.tagless.Embed[CKV,LCKV] = vtoro.tagless.Embed$$anon$2@74f566e0
+// CKVtoLCKV: vtoro.tagless.Embed[CKV,LCKV] = vtoro.tagless.Embed$$anon$2@438afc79
 
 val LoggingToLCKV : Embed[Logging,LCKV] = Embed.left[Logging,CKV]
-// LoggingToLCKV: vtoro.tagless.Embed[Logging,LCKV] = vtoro.tagless.Embed$$anon$1@3ec9696
+// LoggingToLCKV: vtoro.tagless.Embed[Logging,LCKV] = vtoro.tagless.Embed$$anon$1@76a6e06e
 
 val prg3 = for {
   userTuple <- prg2.as( CKVtoLCKV )
@@ -269,7 +269,7 @@ val prg3 = for {
        else
          warning(s"User: '${userTuple._1}' was not authenticated!").as( LoggingToLCKV )
 } yield userTuple
-// prg3: vtoro.tagless.Term[LCKV,(String, Boolean)] = vtoro.tagless.Term$$anon$3@1f2621d8
+// prg3: vtoro.tagless.Term[LCKV,(String, Boolean)] = vtoro.tagless.Term$$anon$3@84113c4
 ```
 
 but we want to do the logging to the console, and we specifically want to use the same console algebra as we used above
@@ -292,14 +292,14 @@ toInterpreter which takes an ```Interpreter[A,M] => Monad[M] => Interpreter[B,M]
 
 ```scala
 val consoleToLogging = Embed[Logging,Console].toAlgebra(c => implicit m => new ConsoleLogging( c ) )
-// consoleToLogging: vtoro.tagless.Embed[Logging,Console] = vtoro.tagless.EmbedBuilder$$anon$6@446cdc3f
+// consoleToLogging: vtoro.tagless.Embed[Logging,Console] = vtoro.tagless.EmbedBuilder$$anon$6@5cb7d7ad
 ```
 
 we can now define an interpreter for ```LCKV```, and use it to run our new program
  
 ```scala
 val testLCKV = consoleToLogging( consoleTest andThen IdToKVState ) and testCKV
-// testLCKV: vtoro.tagless.Interpreter[[X[_]]vtoro.tagless.InterpreterPair[Logging,CKV,X],KVState] = InterpreterInit(InterpreterPair(InterpreterInit(ConsoleLogging@16b17b75),InterpreterInit(InterpreterPair(InterpreterNT(TestConsole$@785d80fa,cats.arrow.NaturalTransformation$$anon$1@1a57fafe),InterpreterInit(TestKVStore$@3bc7c4ee)))))
+// testLCKV: vtoro.tagless.Interpreter[[X[_]]vtoro.tagless.InterpreterPair[Logging,CKV,X],KVState] = InterpreterInit(InterpreterPair(InterpreterInit(ConsoleLogging@6d4bd36),InterpreterInit(InterpreterPair(InterpreterNT(TestConsole$@16d93ea5,cats.arrow.NaturalTransformation$$anon$1@1acfab29),InterpreterInit(TestKVStore$@999293c)))))
 
 prg3.run( testLCKV ).run( Map( "user" -> "password" ) ).value
 // What is your Name?
@@ -327,14 +327,14 @@ we then compose it with whatever natural transformations the ```CKV``` interpret
   
 ```scala
 val LCKVtoCKV : Embed[LCKV,CKV] = Embed[LCKV,CKV].toInterpreter(iCKV => implicit m => consoleToLogging(iCKV.init.left andThen iCKV.nt) and[CKV] iCKV )
-// LCKVtoCKV: vtoro.tagless.Embed[LCKV,CKV] = vtoro.tagless.EmbedBuilder$$anon$7@cbaa398
+// LCKVtoCKV: vtoro.tagless.Embed[LCKV,CKV] = vtoro.tagless.EmbedBuilder$$anon$7@34c3a5b9
 ```
  
 we can now take any ```Term[LCKV,_]``` and embed it in just ```CKV```, and run it with just a ```CKV``` interpreter
  
 ```scala
 val prg3ckv = prg3.as( LCKVtoCKV )
-// prg3ckv: vtoro.tagless.Term[CKV,(String, Boolean)] = vtoro.tagless.Term$$anon$4@2fedcd07
+// prg3ckv: vtoro.tagless.Term[CKV,(String, Boolean)] = vtoro.tagless.Term$$anon$4@52d0da9a
 
 prg3ckv.run( testCKV ).run( Map( "test" -> "test" ) ).value
 // What is your Name?
@@ -388,13 +388,13 @@ type PCKV[M[_]] = (Parallel and CKV)#fin[M]
 // defined type alias PCKV
 
 val CKVtoPCKV : Embed[CKV,PCKV] = Embed.finRight[Parallel,CKV]
-// CKVtoPCKV: vtoro.tagless.Embed[CKV,PCKV] = vtoro.tagless.Embed$$anon$3@13600b15
+// CKVtoPCKV: vtoro.tagless.Embed[CKV,PCKV] = vtoro.tagless.Embed$$anon$3@5dcf7f5d
 
 type FKVState[A] = StateT[Future,Map[String,String],A]
 // defined type alias FKVState
 
 implicit val FKVStateMonad : Monad[FKVState] = StateT.stateTMonadState[Future,Map[String,String]]
-// FKVStateMonad: cats.Monad[FKVState] = cats.data.StateTInstances$$anon$1@34f8718d
+// FKVStateMonad: cats.Monad[FKVState] = cats.data.StateTInstances$$anon$1@5bd3c96c
 
 def parPCKV[X](l: List[Term[PCKV,X]] ) : Term[PCKV,List[X]] = par[CKV,X]( l )
 // parPCKV: [X](l: List[vtoro.tagless.Term[PCKV,X]])vtoro.tagless.Term[PCKV,List[X]]
@@ -420,14 +420,14 @@ object stateToParallel extends ( KVState ~> FKVState) {
 and then we can create our ```PCKV``` interpreter, for this we use an auxiliary ```Final```-builder
 ```scala
 val futurePCKVInterpreter = Final( futureParallel ) and (testCKV andThen stateToParallel)
-// futurePCKVInterpreter: vtoro.tagless.Interpreter[[γ[_$2]]vtoro.tagless.FinalPair[Parallel,CKV,γ],FKVState] = InterpreterInit(FinalPair(futureParallel$@740dca7d,InterpreterNT(InterpreterPair(InterpreterNT(TestConsole$@785d80fa,cats.arrow.NaturalTransformation$$anon$1@1a57fafe),InterpreterInit(TestKVStore$@3bc7c4ee)),cats.arrow.NaturalTransformation$$anon$1@3594380b),cats.data.StateTInstances$$anon$1@34f8718d))
+// futurePCKVInterpreter: vtoro.tagless.Interpreter[[γ[_$2]]vtoro.tagless.FinalPair[Parallel,CKV,γ],FKVState] = InterpreterInit(FinalPair(futureParallel$@3324e0a9,InterpreterNT(InterpreterPair(InterpreterNT(TestConsole$@16d93ea5,cats.arrow.NaturalTransformation$$anon$1@1acfab29),InterpreterInit(TestKVStore$@999293c)),cats.arrow.NaturalTransformation$$anon$1@46ecf06f),cats.data.StateTInstances$$anon$1@5bd3c96c))
 ```
 
 a simple program in ```PCKV```
 
 ```scala
   val prg4 = parPCKV( prg3ckv.as(CKVtoPCKV) :: prg3ckv.as(CKVtoPCKV) :: Nil )
-// prg4: vtoro.tagless.Term[PCKV,List[(String, Boolean)]] = vtoro.tagless.TermBuilder$$anon$8@705736a4
+// prg4: vtoro.tagless.Term[PCKV,List[(String, Boolean)]] = vtoro.tagless.TermBuilder$$anon$8@2846983
 ```
 
 running it, and then waiting for the result
@@ -455,7 +455,7 @@ object futureToId extends (FKVState ~> KVState) {
 // defined object futureToId
 
 val idPCKVInterpreter = futurePCKVInterpreter andThen futureToId
-// idPCKVInterpreter: vtoro.tagless.Interpreter[[γ[_$2]]vtoro.tagless.FinalPair[Parallel,CKV,γ],KVState] = InterpreterNT(FinalPair(futureParallel$@740dca7d,InterpreterNT(InterpreterPair(InterpreterNT(TestConsole$@785d80fa,cats.arrow.NaturalTransformation$$anon$1@1a57fafe),InterpreterInit(TestKVStore$@3bc7c4ee)),cats.arrow.NaturalTransformation$$anon$1@3594380b),cats.data.StateTInstances$$anon$1@34f8718d),cats.arrow.NaturalTransformation$$anon$1@43de9d27)
+// idPCKVInterpreter: vtoro.tagless.Interpreter[[γ[_$2]]vtoro.tagless.FinalPair[Parallel,CKV,γ],KVState] = InterpreterNT(FinalPair(futureParallel$@3324e0a9,InterpreterNT(InterpreterPair(InterpreterNT(TestConsole$@16d93ea5,cats.arrow.NaturalTransformation$$anon$1@1acfab29),InterpreterInit(TestKVStore$@999293c)),cats.arrow.NaturalTransformation$$anon$1@46ecf06f),cats.data.StateTInstances$$anon$1@5bd3c96c),cats.arrow.NaturalTransformation$$anon$1@5145cb04)
 
 prg4.run( idPCKVInterpreter ).run( Map("test" -> "test") ).value
 // What is your Name?

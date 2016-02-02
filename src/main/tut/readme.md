@@ -118,8 +118,8 @@ object idToEval extends (Id ~> Eval) {
 val evalPrg1 = prg1.run( consoleTest andThen idToEval )
 ```
 
-Notice that it did execute the first action of the program before halting the Eval, this is because we need to evaluate the first Id value to get the first Eval value.
-But after we have the first Eval value, it then use flatMap to bind the actions together, and it halts until we call .value on it
+Notice that it did execute the first action of the program before halting the `Eval`, this is because we need to evaluate the first `Id` value to get the first `Eval` value.
+But after we have the first `Eval` value, it then uses `Eval`s flatMap to bind the actions together, and it halts until we call .value on it
 
 ```tut:book
 evalPrg1.value
@@ -128,7 +128,7 @@ evalPrg1.value
 
 ### Pairing algebras
 
-Lets say we want to have a program that uses a key store as well as a console.
+Lets say we want to have a program that uses a key-value store as well as a console.
 
 ```tut:book
 
