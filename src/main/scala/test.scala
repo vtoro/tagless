@@ -66,6 +66,7 @@ object CKV {
   val loggingSyntax = new LoggingSyntax[CKV](LoggingToCKV)
 
   val KVStateInterpreter = Interpreter( TestConsole, IdToKVState ) and Interpreter( TestKVStore )
+  def pure[X]( x:X ) = Term.pure[CKV,X]( x )
 }
 
 object test extends App {
@@ -79,12 +80,12 @@ object test extends App {
     _ <- putLine( s"Hello $name" )
   } yield name
 
-  val prg2 : Term[CKV,(String,Boolean)] = for {
+  val prg2 = for {
     user <- prg1
     maybePwd <- get( user )
     authenticated <-
       (maybePwd.fold
-        ( putLine("You need to create an account!") >> Term.pure[CKV,Boolean](false) )
+        ( putLine("You need to create an account!") >> CKV.pure(false) )
         ( password => putLine("Password:") >> getLine.map( _ == password ) )
       )
   } yield (user, authenticated)
